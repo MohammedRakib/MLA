@@ -1,0 +1,3 @@
+python main.py --train --ckpt_path ckpt --gpu_ids 2 --batch_size 64 --lorb base --modulation Normal --epochs 5 --learning_rate 0.001 --lr_decay_step 70 --lr_decay_ratio 0.1  --dataset CREMAD --gs_flag --dynamic
+python main.py --train --ckpt_path ckpt --gpu_ids 2 --batch_size 64 --lorb base --modulation Normal --epochs 5 --learning_rate 0.001 --lr_decay_step 70 --lr_decay_ratio 0.1  --dataset AVMNIST --gs_flag --dynamic
+python main.py --train --ckpt_path ckpt --gpu_ids 2 --batch_size 64 --lorb base --modulation Normal --epochs 5 --learning_rate 0.001 --lr_decay_step 70 --lr_decay_ratio 0.1  --dataset VGGSound --gs_flag --dynamic

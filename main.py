@@ -1,6 +1,7 @@
 import argparse
 import os
 
+from librosa import ex
 import numpy as np
 import torch
 import torch.nn as nn
@@ -8,9 +9,8 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-import pdb
 
-from dataset.dataset import AVDataset, CAVDataset, M3AEDataset, TVDataset, Modal3Dataset, CLIPDataset
+from dataset.dataset import AVDataset, CAVDataset, CremadDataset, M3AEDataset, TVDataset, Modal3Dataset, CLIPDataset, AVMNIST, VGGSound
 from models.basic_model import AVClassifier, CAVClassifier, M3AEClassifier, Modal3Classifier, CLIPClassifier
 from utils.utils import setup_seed, weight_init, GSPlugin, History
 import datetime
@@ -18,7 +18,7 @@ import datetime
 def get_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', default="CREMA-D", type=str,
-                        help='Currently, we only support Food-101, MVSA, CREMA-D')
+                        help='Currently, we only support Food-101, MVSA, CREMA-D, VGGSound, AVMNIST')
     parser.add_argument('--modulation', default='Normal', type=str,
                         choices=['Normal', 'OGM', 'OGM_GE', "QMF"])
     parser.add_argument('--fusion_method', default='concat', type=str,
@@ -270,7 +270,11 @@ def train_epoch(args, epoch, model, device, dataloader, optimizer, scheduler,
                     if args.clip:
                         a, v, out = model(spec, image)
                     else:
-                        a, v, out = model(spec.unsqueeze(1).float(), image.float())
+                        if args.dataset == "AVMNIST":
+                            spec = spec.float()
+                        else:
+                            spec = spec.unsqueeze(1).float()
+                        a, v, out = model(spec, image.float())
             if args.modulation != "QMF":
                 if args.modal3:
                     if args.fusion_method == 'sum':
@@ -428,7 +432,11 @@ def train_epoch(args, epoch, model, device, dataloader, optimizer, scheduler,
                 if args.clip:
                     a, v = model(spec, image)
                 else:
-                    a, v = model(spec.unsqueeze(1).float(), image.float())
+                    if args.dataset == "AVMNIST":
+                        spec = spec.float()
+                    else:
+                        spec = spec.unsqueeze(1).float()
+                    a, v = model(spec, image.float())
             out_a = model.module.fusion_module.fc_out(a)
             
             loss_a = criterion(out_a, label)
@@ -505,6 +513,10 @@ def valid(args, model, device, dataloader,
         pass
     elif args.dataset == "IEMOCAP":
         n_classes = 4
+    elif args.dataset == "VGGSound":
+        n_classes = 309
+    elif args.dataset == "AVMNIST":
+        n_classes = 10
     else:
         raise NotImplementedError('Incorrect dataset name {}'.format(args.dataset))
     with torch.no_grad():
@@ -631,7 +643,11 @@ def valid(args, model, device, dataloader,
                     if args.clip:
                         a, v = model(spec, image)
                     else:
-                        a, v= model(spec.unsqueeze(1).float(), image.float())
+                        if args.dataset == "AVMNIST":
+                            spec = spec.float()
+                        else:
+                            spec = spec.unsqueeze(1).float()
+                        a, v= model(spec, image.float())
                     
                 out_a = model.module.fusion_module.fc_out(a)
                 out_v = model.module.fusion_module.fc_out(v)
@@ -783,8 +799,20 @@ def main(av_alpha = 0.5):
             train_dataset = M3AEDataset(args, mode='train')
             test_dataset = M3AEDataset(args, mode='test')
         else:
-            train_dataset = AVDataset(args, mode='train')
-            test_dataset = AVDataset(args, mode='test')
+            train_dataset = CremadDataset(mode='train')
+            test_dataset = CremadDataset(mode='test')
+            # train_dataset = AVDataset(args, mode='train')
+            # test_dataset = AVDataset(args, mode='test')
+    elif args.dataset == 'AVMNIST':
+        if args.lorb == "large" or args.lorb == "m3ae":
+            raise NotImplementedError('This dataset does not support large or m3ae')
+        train_dataset = AVMNIST(mode='train')
+        test_dataset = AVMNIST(mode='test')
+    elif args.dataset == 'VGGSound':
+        if args.lorb == "large" or args.lorb == "m3ae":
+            raise NotImplementedError('This dataset does not support large or m3ae')
+        train_dataset = VGGSound(mode='train')
+        test_dataset = VGGSound(mode='test')
     elif args.dataset == 'AVE':
         # Incomplete
         pass
@@ -809,6 +837,10 @@ def main(av_alpha = 0.5):
     else:
         raise NotImplementedError('Incorrect dataset name {}! '
                                   'Only support Food-101, MVSA, and CREMA-D for now!'.format(args.dataset))
+        
+    print("\n WARNING: Testing on a small dataset \n")
+    train_dataset = torch.utils.data.Subset(train_dataset, range(10))
+    test_dataset = torch.utils.data.Subset(test_dataset, range(10))
 
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size,
                                   shuffle=True, num_workers=32, pin_memory=True)
@@ -834,6 +866,7 @@ def main(av_alpha = 0.5):
             log_name = '{}_{}_{}'.format(args.fusion_method, "GS", datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         else:
             log_name = '{}_{}_{}'.format(args.fusion_method, args.modulation, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+
         for epoch in range(args.epochs):
 
             print('Epoch: {}: '.format(epoch))
@@ -842,7 +875,7 @@ def main(av_alpha = 0.5):
 
                 writer_path = os.path.join(args.tensorboard_path, args.dataset, log_name)
                 if not os.path.exists(writer_path):
-                    os.mkdir(writer_path)
+                    os.makedirs(writer_path, exist_ok=True)
                 writer = SummaryWriter(writer_path)
 
                 if args.modal3:

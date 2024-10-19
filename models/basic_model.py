@@ -22,6 +22,10 @@ class AVClassifier(nn.Module):
             n_classes = 6
         elif args.dataset == 'AVE':
             pass
+        elif args.dataset == 'AVMNIST':
+            n_classes = 10
+        elif args.dataset == 'VGGSound':
+            n_classes = 309
         else:
             raise NotImplementedError('Incorrect dataset name {}'.format(args.dataset))
 
@@ -40,7 +44,10 @@ class AVClassifier(nn.Module):
             raise NotImplementedError('Incorrect fusion method: {}!'.format(fusion))
 
         self.audio_net = resnet18(modality='audio')
-        self.visual_net = resnet18(modality='visual')
+        if args.dataset == 'AVMNIST':
+            self.visual_net = resnet18(modality='image')
+        else:
+            self.visual_net = resnet18(modality='visual')
 
         if args.modulation == "QMF":
             self.audio_fc = nn.Linear(512, n_classes)
@@ -53,13 +60,16 @@ class AVClassifier(nn.Module):
         a = self.audio_net(audio)
         v = self.visual_net(visual)
 
-        (_, C, H, W) = v.size()
+        (_, C, H, W) = v.size() 
         B = a.size()[0]
         v = v.view(B, -1, C, H, W)
         v = v.permute(0, 2, 1, 3, 4)
 
+        if self.args.dataset == 'AVMNIST':
+            v = F.adaptive_avg_pool2d(v, 1)
+        else:
+            v = F.adaptive_avg_pool3d(v, 1)
         a = F.adaptive_avg_pool2d(a, 1)
-        v = F.adaptive_avg_pool3d(v, 1)
 
         a = torch.flatten(a, 1)
         v = torch.flatten(v, 1)
