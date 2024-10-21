@@ -399,6 +399,7 @@ def train_epoch(args, epoch, model, device, dataloader, optimizer, scheduler,
 
                             if 'audio' in layer and len(parms.grad.size()) == 4:
                                 if args.modulation == 'OGM_GE':
+                                    # print(f"\n Doing Audio OGM GE \n")
                                     parms.grad = parms.grad * coeff_a + \
                                                 torch.zeros_like(parms.grad).normal_(0, parms.grad.std().item() + 1e-8)
                                 elif args.modulation == 'OGM':
@@ -406,6 +407,7 @@ def train_epoch(args, epoch, model, device, dataloader, optimizer, scheduler,
 
                             if 'visual' in layer and len(parms.grad.size()) == 4:
                                 if args.modulation == 'OGM_GE':
+                                    # print(f"\n Doing Visual OGM GE \n")
                                     parms.grad = parms.grad * coeff_v + \
                                                 torch.zeros_like(parms.grad).normal_(0, parms.grad.std().item() + 1e-8)
                                 elif args.modulation == 'OGM':
