@@ -368,9 +368,9 @@ class MaskedMultimodalAutoencoder(nn.Module):
 if __name__ == "__main__":
     # @title Choose model size and load pretrained weights 
 
-    model_type = 'large' #@param ["small", "base", "large"]
-    model_path = '/data1/zhangxiaohui/OGM-GE/m3ae_large.pkl'
-    model_config = ConfigDict(dict(model_type='large')) 
+    model_type = 'base' #@param ["small", "base", "large"]
+    model_path = '/data1/zhangxiaohui/OGM-GE/m3ae_base.pkl'
+    model_config = ConfigDict(dict(model_type='base')) 
     model = MaskedMultimodalAutoencoder(text_vocab_size = 30522, config_updates = model_config)
 
     # load Jax pretrained weights
